@@ -28,7 +28,7 @@ defmodule Aoc2019.Day02Test do
     assert actual == expected
   end
 
-  # test "part 1 is solved correctly" do
-  #   assert solve_part_one() == 3_560_353
-  # end
+  test "part 1 is solved correctly" do
+    assert solve_part_one() == 4_090_701
+  end
 end

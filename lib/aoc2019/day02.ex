@@ -13,10 +13,10 @@ defmodule Aoc2019.Day02 do
 
   @spec solve_part_one :: value()
   def solve_part_one() do
-    end_state =
-      read_input(2)
-      |> execute_program()
+    program = read_input(2) |> parse_input()
+    program = Map.put(program, 1, 12) |> Map.put(2, 2)
 
+    end_state = interpret(%{program: program, instruction_ptr: 0})
     Map.fetch!(end_state, 0)
   end
 
