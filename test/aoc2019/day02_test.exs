@@ -2,8 +2,6 @@ defmodule Aoc2019.Day02Test do
   use ExUnit.Case
   import Aoc2019.Day02
 
-  doctest Aoc2019.Day02
-
   test "interprets example programs correclty" do
     program = "1,9,10,3,2,3,11,0,99,30,40,50"
     actual = execute_program(program)
