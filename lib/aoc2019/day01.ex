@@ -1,19 +1,4 @@
 defmodule Aoc2019.Day01 do
-  @moduledoc """
-  Day 1 of AoC 2019.
-
-  ## Part 1
-  The task is as follows:
-
-  ```
-  Fuel required to launch a given module is based on its mass.
-  Specifically, to find the fuel required for a module, take its mass, divide by three, round down, and subtract 2.
-
-  The Fuel Counter-Upper needs to know the total fuel requirement.
-  To find it, individually calculate the fuel needed for the mass of each module (your puzzle input),
-  then add together all the fuel values.
-  ```
-  """
   import Aoc2019
 
   @spec solve_part_one() :: non_neg_integer() | no_return()
