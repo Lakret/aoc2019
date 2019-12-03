@@ -11,6 +11,13 @@ defmodule Aoc2019.Day02 do
           instruction_ptr: instruction_ptr()
         }
 
+  @doc """
+  # Task
+
+  Before running the program, replace position 1 with the value 12 and replace position 2 with the value 2.
+
+  What value is left at position 0 after the program halts?
+  """
   @spec solve_part_one :: value()
   def solve_part_one() do
     read_input(2)
@@ -20,10 +27,17 @@ defmodule Aoc2019.Day02 do
     |> get_result()
   end
 
+  @doc """
+  # Task
+
+  Find the input noun and verb that cause the program to produce the output 19690720.
+
+  What is 100 * noun + verb? (For example, if noun=12 and verb=2, the answer would be 1202.)
+
+  Each of the two input values will be between 0 and 99, inclusive.
+  """
+  @spec solve_part_two() :: number
   def solve_part_two() do
-    # Find the input noun and verb that cause the program to produce the output 19690720.
-    # What is 100 * noun + verb? (For example, if noun=12 and verb=2, the answer would be 1202.)
-    # Each of the two input values will be between 0 and 99, inclusive.
     program = read_input(2) |> parse_input()
 
     {noun, verb} =
@@ -58,7 +72,7 @@ defmodule Aoc2019.Day02 do
     Map.fetch!(end_program_state, 0)
   end
 
-  @spec execute_program(input :: String.t()) :: state()
+  @spec execute_program(input :: String.t()) :: program()
   def execute_program(input) do
     parse_input(input)
     |> interpret()
