@@ -31,4 +31,8 @@ defmodule Aoc2019.Day02Test do
   test "part 1 is solved correctly" do
     assert solve_part_one() == 4_090_701
   end
+
+  test "part 2 is solved correctly" do
+    assert solve_part_two() == 6421
+  end
 end

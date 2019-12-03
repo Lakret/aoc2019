@@ -3,7 +3,7 @@ defmodule Aoc2019.Day02 do
 
   @type program :: %{non_neg_integer() => integer()}
 
-  @type ptr :: non_neg_integer()
+  @type address :: non_neg_integer()
   @type value :: integer()
   @type instruction_ptr :: non_neg_integer()
   @type state :: %{
@@ -13,26 +13,62 @@ defmodule Aoc2019.Day02 do
 
   @spec solve_part_one :: value()
   def solve_part_one() do
-    program = read_input(2) |> parse_input()
-    program = Map.put(program, 1, 12) |> Map.put(2, 2)
+    read_input(2)
+    |> parse_input()
+    |> parametrize(12, 2)
+    |> interpret()
+    |> get_result()
+  end
 
-    end_state = interpret(%{program: program, instruction_ptr: 0})
-    Map.fetch!(end_state, 0)
+  def solve_part_two() do
+    # Find the input noun and verb that cause the program to produce the output 19690720.
+    # What is 100 * noun + verb? (For example, if noun=12 and verb=2, the answer would be 1202.)
+    # Each of the two input values will be between 0 and 99, inclusive.
+    program = read_input(2) |> parse_input()
+
+    {noun, verb} =
+      try do
+        for noun <- 0..99, verb <- 0..99 do
+          result =
+            parametrize(program, noun, verb)
+            |> interpret()
+            |> get_result()
+
+          if result == 19_690_720 do
+            throw({noun, verb})
+          end
+        end
+      catch
+        {noun, verb} -> {noun, verb}
+      end
+
+    # corect noun and verb turned out to be: {64, 21}
+    100 * noun + verb
+  end
+
+  # Helpers
+
+  @spec parametrize(program(), noun :: value(), verb :: value()) :: program()
+  def parametrize(program, noun, verb) do
+    Map.put(program, 1, noun) |> Map.put(2, verb)
+  end
+
+  @spec get_result(end_program_state :: program()) :: value()
+  def get_result(end_program_state) do
+    Map.fetch!(end_program_state, 0)
   end
 
   @spec execute_program(input :: String.t()) :: state()
   def execute_program(input) do
-    program = parse_input(input)
-    interpret(%{program: program, instruction_ptr: 0})
+    parse_input(input)
+    |> interpret()
   end
-
-  # Helpers
 
   @terminate_op 99
   @add_op 1
   @multiply_op 2
 
-  @spec interpret(state :: state()) :: program() | no_return()
+  @spec interpret(program_or_state :: program() | state()) :: program() | no_return()
   def interpret(%{program: program, instruction_ptr: instruction_ptr}) do
     case Map.fetch!(program, instruction_ptr) do
       @terminate_op ->
@@ -48,6 +84,10 @@ defmodule Aoc2019.Day02 do
     end
   end
 
+  def interpret(program) do
+    interpret(%{program: program, instruction_ptr: 0})
+  end
+
   @type binary_operation :: (value(), value() -> value())
 
   @spec execute_binary_operation(program(), instruction_ptr(), operation :: binary_operation()) :: state()
@@ -61,7 +101,7 @@ defmodule Aoc2019.Day02 do
   end
 
   @spec get_arguments(program(), instruction_ptr()) ::
-          {arg1 :: value(), arg2 :: value(), res_idx :: ptr()}
+          {arg1 :: value(), arg2 :: value(), res_idx :: address()}
   def get_arguments(program, instruction_ptr) do
     arg1_idx = Map.fetch!(program, instruction_ptr + 1)
     arg2_idx = Map.fetch!(program, instruction_ptr + 2)
