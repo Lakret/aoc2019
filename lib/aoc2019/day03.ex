@@ -11,6 +11,10 @@ defmodule Aoc2019.Day03 do
 
   @type distance :: non_neg_integer()
 
+  @type steps_taken :: non_neg_integer()
+  @type coords_to_min_steps :: %{coord() => steps_taken()}
+  @type steps_taken_and_intersection :: {steps_taken(), coord()}
+
   @spec solve_part_one :: distance()
   def solve_part_one() do
     {distance, _intersection} =
@@ -22,6 +26,17 @@ defmodule Aoc2019.Day03 do
     distance
   end
 
+  @spec solve_part_two :: steps_taken()
+  def solve_part_two() do
+    {combined_steps, _intersection} =
+      read_input(3)
+      |> String.split()
+      |> Enum.map(&parse_path/1)
+      |> find_minimum_combined_steps_intersection()
+
+    combined_steps
+  end
+
   # Helpers
 
   @spec find_intersection_closest_to_the_port(paths :: [path()]) :: {distance(), coord()}
@@ -31,6 +46,47 @@ defmodule Aoc2019.Day03 do
     |> Enum.map(fn intersection -> {manhattan_distance_from_port(intersection), intersection} end)
     |> Enum.sort(fn {dist1, _intersection1}, {dist2, _intersection2} -> dist1 < dist2 end)
     |> hd()
+  end
+
+  @spec find_minimum_combined_steps_intersection([path()]) :: steps_taken_and_intersection()
+  def find_minimum_combined_steps_intersection(paths) when is_list(paths) do
+    calculate_minimum_combined_steps_for_each_intersection(paths)
+    |> Enum.sort(fn {steps_taken1, _intersection1}, {steps_taken2, _intersection2} -> steps_taken1 < steps_taken2 end)
+    |> hd()
+  end
+
+  @spec calculate_minimum_combined_steps_for_each_intersection([path()]) :: [steps_taken_and_intersection()]
+  def calculate_minimum_combined_steps_for_each_intersection(paths) when is_list(paths) do
+    coords_to_min_steps_maps = Enum.map(paths, &trace_coords_to_min_steps/1)
+
+    Enum.map(coords_to_min_steps_maps, &Map.keys/1)
+    |> find_intersections()
+    |> Enum.map(fn intersection ->
+      minimum_combined_steps =
+        Enum.map(coords_to_min_steps_maps, &Map.fetch!(&1, intersection))
+        |> Enum.sum()
+
+      {minimum_combined_steps, intersection}
+    end)
+  end
+
+  @spec trace_coords_to_min_steps(path()) :: coords_to_min_steps()
+  def trace_coords_to_min_steps(path) when is_list(path) do
+    {_position, coords_to_min_steps, _steps_taken} =
+      Enum.reduce(path, {{0, 0}, %{}, 0}, fn step, {position, coords_to_min_steps, steps_taken} ->
+        coords_with_steps_taken = perform_step(step, position) |> Enum.with_index(steps_taken + 1)
+
+        coords_to_min_steps =
+          Enum.reduce(coords_with_steps_taken, coords_to_min_steps, fn {coord, steps_taken}, coords_to_min_steps ->
+            Map.put_new(coords_to_min_steps, coord, steps_taken)
+          end)
+
+        {position, steps_taken} = List.last(coords_with_steps_taken)
+
+        {position, coords_to_min_steps, steps_taken}
+      end)
+
+    coords_to_min_steps
   end
 
   @spec parse_path(path :: String.t()) :: path()
@@ -58,6 +114,7 @@ defmodule Aoc2019.Day03 do
 
         position = List.last(new_trace_elements)
         trace = trace ++ new_trace_elements
+
         {position, trace}
       end)
 

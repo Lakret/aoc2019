@@ -76,4 +76,42 @@ defmodule Aoc2019.Day03Test do
   test "part 1 is solved correctly" do
     assert solve_part_one() == 293
   end
+
+  test "trace_coords_to_min_steps works" do
+    coords_to_min_steps = trace_coords_to_min_steps(@path1)
+
+    expected_coords_to_min_steps = Enum.with_index(@path1_trace, 1) |> Enum.into(%{})
+    assert coords_to_min_steps == expected_coords_to_min_steps
+
+    assert coords_to_min_steps[{3, 3}] == 20
+  end
+
+  test "calculate_minimum_combined_steps_for_each_intersection works" do
+    steps_taken_and_intersections = calculate_minimum_combined_steps_for_each_intersection([@path1, @path2])
+
+    assert steps_taken_and_intersections == [{40, {3, 3}}, {30, {6, 5}}]
+  end
+
+  test "find_minimum_combined_steps_intersection works" do
+    {steps_taken, intersection} = find_minimum_combined_steps_intersection([@path1, @path2])
+
+    assert steps_taken == 30
+    assert intersection == {6, 5}
+
+    path1 = parse_path("R75,D30,R83,U83,L12,D49,R71,U7,L72")
+    path2 = parse_path("U62,R66,U55,R34,D71,R55,D58,R83")
+    {steps_taken, _intersection} = find_minimum_combined_steps_intersection([path1, path2])
+
+    assert steps_taken == 610
+
+    path1 = parse_path("R98,U47,R26,D63,R33,U87,L62,D20,R33,U53,R51")
+    path2 = parse_path("U98,R91,D20,R16,D67,R40,U7,R15,U6,R7")
+    {steps_taken, _intersection} = find_minimum_combined_steps_intersection([path1, path2])
+
+    assert steps_taken == 410
+  end
+
+  test "part 2 is solved correctly" do
+    assert solve_part_two() == 27306
+  end
 end
