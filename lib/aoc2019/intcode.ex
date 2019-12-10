@@ -21,8 +21,14 @@ defmodule Aoc2019.Intcode do
 
   # Instructions
   @terminate_op 99
+  @jump_if_true_op 5
+  @jump_if_false_op 6
+
   @add_op 1
   @multiply_op 2
+  @less_than_op 7
+  @equals_op 8
+
   @input_op 3
   @output_op 4
 
@@ -59,12 +65,12 @@ defmodule Aoc2019.Intcode do
         program
 
       @add_op ->
-        new_state = execute_binary_operation(program, parameter_modes, instruction_ptr, &+/2)
-        interpret(new_state)
+        execute_binary_operation(program, parameter_modes, instruction_ptr, &+/2)
+        |> interpret()
 
       @multiply_op ->
-        new_state = execute_binary_operation(program, parameter_modes, instruction_ptr, &*/2)
-        interpret(new_state)
+        execute_binary_operation(program, parameter_modes, instruction_ptr, &*/2)
+        |> interpret()
 
       @input_op ->
         # take input
@@ -90,6 +96,50 @@ defmodule Aoc2019.Intcode do
         instruction_ptr = advance_instruction_ptr(instruction_ptr, 2)
 
         interpret(%{program: program, instruction_ptr: instruction_ptr})
+
+      @jump_if_true_op ->
+        {arg1, arg2} = read_two_arguments(program, parameter_modes, instruction_ptr)
+
+        instruction_ptr =
+          if arg1 != 0 do
+            arg2
+          else
+            advance_instruction_ptr(instruction_ptr, 3)
+          end
+
+        interpret(%{program: program, instruction_ptr: instruction_ptr})
+
+      @jump_if_false_op ->
+        {arg1, arg2} = read_two_arguments(program, parameter_modes, instruction_ptr)
+
+        instruction_ptr =
+          if arg1 == 0 do
+            arg2
+          else
+            advance_instruction_ptr(instruction_ptr, 3)
+          end
+
+        interpret(%{program: program, instruction_ptr: instruction_ptr})
+
+      @less_than_op ->
+        execute_binary_operation(program, parameter_modes, instruction_ptr, fn arg1, arg2 ->
+          if arg1 < arg2 do
+            1
+          else
+            0
+          end
+        end)
+        |> interpret()
+
+      @equals_op ->
+        execute_binary_operation(program, parameter_modes, instruction_ptr, fn arg1, arg2 ->
+          if arg1 == arg2 do
+            1
+          else
+            0
+          end
+        end)
+        |> interpret()
     end
   end
 
@@ -131,14 +181,20 @@ defmodule Aoc2019.Intcode do
   @spec get_binary_arguments(program(), [parameter_mode()], instruction_ptr()) ::
           {arg1 :: value(), arg2 :: value(), res_idx :: address()}
   def get_binary_arguments(program, parameter_modes, instruction_ptr) do
+    {arg1, arg2} = read_two_arguments(program, parameter_modes, instruction_ptr)
+    res_idx = Map.fetch!(program.body, instruction_ptr + 3)
+    {arg1, arg2, res_idx}
+  end
+
+  @spec read_two_arguments(program(), [parameter_mode()], instruction_ptr()) :: {value(), value()}
+  def read_two_arguments(program, parameter_modes, instruction_ptr) do
     arg1_idx = Map.fetch!(program.body, instruction_ptr + 1)
     arg2_idx = Map.fetch!(program.body, instruction_ptr + 2)
-    res_idx = Map.fetch!(program.body, instruction_ptr + 3)
 
     arg1 = fetch_parameter(program.body, arg1_idx, 0, parameter_modes)
     arg2 = fetch_parameter(program.body, arg2_idx, 1, parameter_modes)
 
-    {arg1, arg2, res_idx}
+    {arg1, arg2}
   end
 
   @spec fetch_parameter(body(), address() | value(), non_neg_integer(), [parameter_mode()]) :: any
