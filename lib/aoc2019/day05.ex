@@ -3,10 +3,17 @@ defmodule Aoc2019.Day05 do
 
   alias Aoc2019.Intcode
 
-  @spec solve_part_one :: Intcode.value()
+  @spec solve_part_one() :: Intcode.value()
   def solve_part_one() do
     read_input(5)
     |> Intcode.execute_program([1])
+    |> extract_diagnostic_code!()
+  end
+
+  @spec solve_part_two() :: Intcode.value()
+  def solve_part_two() do
+    read_input(5)
+    |> Intcode.execute_program([5])
     |> extract_diagnostic_code!()
   end
 

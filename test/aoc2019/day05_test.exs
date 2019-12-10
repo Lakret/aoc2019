@@ -9,6 +9,10 @@ defmodule Aoc2019.Day05Test do
     assert solve_part_one() == 4_601_506
   end
 
+  test "part 2 is solved correctly" do
+    assert solve_part_two() == 5_525_561
+  end
+
   test "opcode and parameter modes are parsed correctly" do
     {opcode, parameter_modes} = Intcode.parse_instruction(1002)
 
@@ -82,5 +86,21 @@ defmodule Aoc2019.Day05Test do
 
     executed_program = Intcode.execute_program(non_zero_immediate_program, [0])
     assert executed_program.outputs == [0]
+  end
+
+  test "part2 test works" do
+    program =
+      "3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31," <>
+        "1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104," <>
+        "999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99"
+
+    executed_program = Intcode.execute_program(program, [7])
+    assert executed_program.outputs == [999]
+
+    executed_program = Intcode.execute_program(program, [8])
+    assert executed_program.outputs == [1000]
+
+    executed_program = Intcode.execute_program(program, [9])
+    assert executed_program.outputs == [1001]
   end
 end
