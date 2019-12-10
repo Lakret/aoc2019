@@ -13,12 +13,21 @@ defmodule Aoc2019.Intcode do
           instruction_ptr: instruction_ptr()
         }
 
+  @type opcode :: non_neg_integer()
+  @type parameter_mode :: non_neg_integer()
+
+  @type binary_operation :: (value(), value() -> value())
+
   # Instructions
   @terminate_op 99
   @add_op 1
   @multiply_op 2
   @input_op 3
   @output_op 4
+
+  # Parameter modes
+  @position_mode 0
+  @immediate_mode 1
 
   @spec parametrize_first_and_second_addresses(program(), noun :: value(), verb :: value()) :: program()
   def parametrize_first_and_second_addresses(program, noun, verb) do
@@ -39,25 +48,52 @@ defmodule Aoc2019.Intcode do
     Map.fetch!(end_program_state.body, 0)
   end
 
-  @spec execute_program(input :: String.t()) :: program()
-  def execute_program(input) do
-    parse_input(input)
+  @spec execute_program(input :: String.t(), inputs :: [integer()]) :: program()
+  def execute_program(input, inputs \\ []) do
+    parse_input(input, inputs)
     |> interpret()
   end
 
   @spec interpret(program_or_state :: program() | state()) :: program() | no_return()
   def interpret(%{program: program, instruction_ptr: instruction_ptr}) do
-    case Map.fetch!(program.body, instruction_ptr) do
+    {opcode, parameter_modes} = Map.fetch!(program.body, instruction_ptr) |> parse_instruction()
+
+    case opcode do
       @terminate_op ->
         program
 
       @add_op ->
-        new_state = execute_binary_operation(program, instruction_ptr, &+/2)
+        new_state = execute_binary_operation(program, parameter_modes, instruction_ptr, &+/2)
         interpret(new_state)
 
       @multiply_op ->
-        new_state = execute_binary_operation(program, instruction_ptr, &*/2)
+        new_state = execute_binary_operation(program, parameter_modes, instruction_ptr, &*/2)
         interpret(new_state)
+
+      @input_op ->
+        # take input
+        [input | remaining_inputs] = program.inputs
+        program = Map.put(program, :inputs, remaining_inputs)
+
+        # read the result address
+        res_idx = Map.fetch!(program.body, instruction_ptr + 1)
+
+        # save input at the result address, and advance the instruction pointer
+        program = put_in(program, [:body, res_idx], input)
+        instruction_ptr = advance_instruction_ptr(instruction_ptr, 2)
+
+        interpret(%{program: program, instruction_ptr: instruction_ptr})
+
+      @output_op ->
+        # read the value (accounting for the parameter mode)
+        output_idx_or_value = Map.fetch!(program.body, instruction_ptr + 1)
+        output = fetch_parameter(program.body, output_idx_or_value, 0, parameter_modes)
+
+        # output it, advance the instruction pointer
+        program = put_in(program.outputs, program.outputs ++ [output])
+        instruction_ptr = advance_instruction_ptr(instruction_ptr, 2)
+
+        interpret(%{program: program, instruction_ptr: instruction_ptr})
     end
   end
 
@@ -65,11 +101,30 @@ defmodule Aoc2019.Intcode do
     interpret(%{program: program, instruction_ptr: 0})
   end
 
-  @type binary_operation :: (value(), value() -> value())
+  @spec parse_instruction(non_neg_integer()) :: {opcode(), [parameter_mode()]}
+  def parse_instruction(instruction) when is_integer(instruction) do
+    if instruction < 10 do
+      {instruction, []}
+    else
+      [opcode_char2 | [opcode_char1 | parameter_modes]] =
+        to_string(instruction) |> String.codepoints() |> Enum.reverse()
 
-  @spec execute_binary_operation(program(), instruction_ptr(), operation :: binary_operation()) :: state()
-  def execute_binary_operation(program, instruction_ptr, operation) do
-    {arg1, arg2, res_idx} = get_arguments(program, instruction_ptr)
+      {opcode, ""} = [opcode_char1, opcode_char2] |> to_string() |> Integer.parse()
+
+      parameter_modes =
+        Enum.map(parameter_modes, fn mode_char ->
+          {mode, ""} = Integer.parse(mode_char)
+          mode
+        end)
+
+      {opcode, parameter_modes}
+    end
+  end
+
+  @spec execute_binary_operation(program(), [parameter_mode()], instruction_ptr(), operation :: binary_operation()) ::
+          state()
+  def execute_binary_operation(program, parameter_modes, instruction_ptr, operation) do
+    {arg1, arg2, res_idx} = get_binary_arguments(program, parameter_modes, instruction_ptr)
     res = operation.(arg1, arg2)
     program = put_in(program.body, Map.put(program.body, res_idx, res))
     instruction_ptr = advance_instruction_ptr(instruction_ptr)
@@ -77,24 +132,31 @@ defmodule Aoc2019.Intcode do
     %{program: program, instruction_ptr: instruction_ptr}
   end
 
-  @spec get_arguments(program(), instruction_ptr()) ::
+  @spec get_binary_arguments(program(), [parameter_mode()], instruction_ptr()) ::
           {arg1 :: value(), arg2 :: value(), res_idx :: address()}
-  def get_arguments(program, instruction_ptr) do
+  def get_binary_arguments(program, parameter_modes, instruction_ptr) do
     arg1_idx = Map.fetch!(program.body, instruction_ptr + 1)
     arg2_idx = Map.fetch!(program.body, instruction_ptr + 2)
     res_idx = Map.fetch!(program.body, instruction_ptr + 3)
 
-    arg1 = Map.fetch!(program.body, arg1_idx)
-    arg2 = Map.fetch!(program.body, arg2_idx)
+    arg1 = fetch_parameter(program.body, arg1_idx, 0, parameter_modes)
+    arg2 = fetch_parameter(program.body, arg2_idx, 1, parameter_modes)
 
     {arg1, arg2, res_idx}
+  end
+
+  def fetch_parameter(body, parameter_idx_or_value, mode_idx, parameter_modes) do
+    case Enum.at(parameter_modes, mode_idx, 0) do
+      @position_mode -> Map.fetch!(body, parameter_idx_or_value)
+      @immediate_mode -> parameter_idx_or_value
+    end
   end
 
   @spec advance_instruction_ptr(instruction_ptr(), step :: non_neg_integer()) :: instruction_ptr()
   def advance_instruction_ptr(instruction_ptr, step \\ 4), do: instruction_ptr + step
 
-  @spec parse_input(input :: String.t()) :: program()
-  def parse_input(input) when is_binary(input) do
+  @spec parse_input(String.t(), [integer()]) :: program()
+  def parse_input(input, inputs \\ []) when is_binary(input) do
     body =
       String.split(input, ",")
       |> Enum.with_index()
@@ -104,6 +166,6 @@ defmodule Aoc2019.Intcode do
       end)
       |> Enum.into(%{})
 
-    %{body: body, inputs: [], outputs: []}
+    %{body: body, inputs: inputs, outputs: []}
   end
 end
