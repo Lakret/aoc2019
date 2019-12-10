@@ -3,7 +3,8 @@ defmodule Aoc2019.Intcode do
   Implementation of Intcode computer used in days 2 and 5.
   """
 
-  @type program :: %{body: %{non_neg_integer() => integer()}, inputs: [integer()], outputs: [integer()]}
+  @type program :: %{body: body, inputs: [integer()], outputs: [integer()]}
+  @type body :: %{non_neg_integer() => integer()}
 
   @type address :: non_neg_integer()
   @type value :: integer()
@@ -36,11 +37,6 @@ defmodule Aoc2019.Intcode do
       |> Map.put(2, verb)
 
     Map.put(program, :body, body)
-  end
-
-  @spec parametrize(program(), [integer()]) :: program()
-  def parametrize(program, params) when is_list(params) do
-    put_in(program.inputs, params)
   end
 
   @spec get_result(end_program_state :: program()) :: value()
@@ -145,6 +141,7 @@ defmodule Aoc2019.Intcode do
     {arg1, arg2, res_idx}
   end
 
+  @spec fetch_parameter(body(), address() | value(), non_neg_integer(), [parameter_mode()]) :: any
   def fetch_parameter(body, parameter_idx_or_value, mode_idx, parameter_modes) do
     case Enum.at(parameter_modes, mode_idx, 0) do
       @position_mode -> Map.fetch!(body, parameter_idx_or_value)

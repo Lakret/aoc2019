@@ -6,7 +6,7 @@ defmodule Aoc2019.Day05Test do
   alias Aoc2019.Intcode
 
   test "part 1 is solved correctly" do
-    assert solve_part_one() == 0
+    assert solve_part_one() == 4_601_506
   end
 
   test "opcode and parameter modes are parsed correctly" do
