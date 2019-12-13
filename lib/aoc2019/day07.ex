@@ -45,7 +45,8 @@ defmodule Aoc2019.Day07 do
           {phase_setting :: [phase()], thruster_signal :: non_neg_integer()}
   def find_best_phase_setting_in_feedback_mode(amplifier_program) do
     generate_phase_settings(@min_feedback_phase, @max_feedback_phase)
-    |> Enum.map(&with_computed_feedback_thruster_signal(&1, amplifier_program))
+    |> Task.async_stream(&with_computed_feedback_thruster_signal(&1, amplifier_program))
+    |> Enum.map(fn {:ok, res} -> res end)
     |> Enum.max_by(fn {_phase_setting, thruster_signal} -> thruster_signal end)
   end
 

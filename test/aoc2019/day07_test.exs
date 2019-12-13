@@ -7,6 +7,7 @@ defmodule Aoc2019.Day07Test do
     assert solve_part_one() == 43812
   end
 
+  @tag :expensive
   test "part 2 is solved correctly" do
     assert solve_part_two() == 59_597_414
   end
