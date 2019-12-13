@@ -19,6 +19,9 @@ defmodule Aoc2019.Intcode do
 
   @type binary_operation :: (value(), value() -> value())
 
+  @type input_fun :: (() -> value()) | nil
+  @type output_fun :: (value() -> :ok) | nil
+
   # Instructions
   @terminate_op 99
   @jump_if_true_op 5
@@ -56,8 +59,17 @@ defmodule Aoc2019.Intcode do
     |> interpret()
   end
 
-  @spec interpret(program_or_state :: program() | state()) :: program() | no_return()
-  def interpret(%{program: program, instruction_ptr: instruction_ptr}) do
+  @spec execute_program_with_io_adapter(input :: String.t(), inputs :: [integer()], input_fun(), output_fun()) ::
+          program()
+  def execute_program_with_io_adapter(input, inputs, input_fun, output_fun) do
+    parse_input(input, inputs)
+    |> interpret(input_fun, output_fun)
+  end
+
+  @spec interpret(program_or_state :: program() | state(), input_fun(), output_fun()) :: program() | no_return()
+  def interpret(program_or_state, input_fun \\ nil, output_fun \\ nil)
+
+  def interpret(%{program: program, instruction_ptr: instruction_ptr}, input_fun, output_fun) do
     {opcode, parameter_modes} = Map.fetch!(program.body, instruction_ptr) |> parse_instruction()
 
     case opcode do
@@ -66,16 +78,25 @@ defmodule Aoc2019.Intcode do
 
       @add_op ->
         execute_binary_operation(program, parameter_modes, instruction_ptr, &+/2)
-        |> interpret()
+        |> interpret(input_fun, output_fun)
 
       @multiply_op ->
         execute_binary_operation(program, parameter_modes, instruction_ptr, &*/2)
-        |> interpret()
+        |> interpret(input_fun, output_fun)
 
       @input_op ->
         # take input
-        [input | remaining_inputs] = program.inputs
-        program = Map.put(program, :inputs, remaining_inputs)
+        {input, program} =
+          case program.inputs do
+            [] ->
+              if is_nil(input_fun), do: raise("Ran out of inputs and input_fun is not set!")
+
+              input = input_fun.()
+              {input, program}
+
+            [input | remaining_inputs] ->
+              {input, Map.put(program, :inputs, remaining_inputs)}
+          end
 
         # read the result address
         res_idx = Map.fetch!(program.body, instruction_ptr + 1)
@@ -84,7 +105,7 @@ defmodule Aoc2019.Intcode do
         program = put_in(program, [:body, res_idx], input)
         instruction_ptr = advance_instruction_ptr(instruction_ptr, 2)
 
-        interpret(%{program: program, instruction_ptr: instruction_ptr})
+        interpret(%{program: program, instruction_ptr: instruction_ptr}, input_fun, output_fun)
 
       @output_op ->
         # read the value (accounting for the parameter mode)
@@ -93,9 +114,14 @@ defmodule Aoc2019.Intcode do
 
         # output it, advance the instruction pointer
         program = put_in(program.outputs, program.outputs ++ [output])
+
+        if not is_nil(output_fun) do
+          output_fun.(output)
+        end
+
         instruction_ptr = advance_instruction_ptr(instruction_ptr, 2)
 
-        interpret(%{program: program, instruction_ptr: instruction_ptr})
+        interpret(%{program: program, instruction_ptr: instruction_ptr}, input_fun, output_fun)
 
       @jump_if_true_op ->
         {arg1, arg2} = read_two_arguments(program, parameter_modes, instruction_ptr)
@@ -107,7 +133,7 @@ defmodule Aoc2019.Intcode do
             advance_instruction_ptr(instruction_ptr, 3)
           end
 
-        interpret(%{program: program, instruction_ptr: instruction_ptr})
+        interpret(%{program: program, instruction_ptr: instruction_ptr}, input_fun, output_fun)
 
       @jump_if_false_op ->
         {arg1, arg2} = read_two_arguments(program, parameter_modes, instruction_ptr)
@@ -119,7 +145,7 @@ defmodule Aoc2019.Intcode do
             advance_instruction_ptr(instruction_ptr, 3)
           end
 
-        interpret(%{program: program, instruction_ptr: instruction_ptr})
+        interpret(%{program: program, instruction_ptr: instruction_ptr}, input_fun, output_fun)
 
       @less_than_op ->
         execute_binary_operation(program, parameter_modes, instruction_ptr, fn arg1, arg2 ->
@@ -129,7 +155,7 @@ defmodule Aoc2019.Intcode do
             0
           end
         end)
-        |> interpret()
+        |> interpret(input_fun, output_fun)
 
       @equals_op ->
         execute_binary_operation(program, parameter_modes, instruction_ptr, fn arg1, arg2 ->
@@ -139,12 +165,12 @@ defmodule Aoc2019.Intcode do
             0
           end
         end)
-        |> interpret()
+        |> interpret(input_fun, output_fun)
     end
   end
 
-  def interpret(program) do
-    interpret(%{program: program, instruction_ptr: 0})
+  def interpret(program, input_fun, output_fun) do
+    interpret(%{program: program, instruction_ptr: 0}, input_fun, output_fun)
   end
 
   @spec parse_instruction(non_neg_integer()) :: {opcode(), [parameter_mode()]}
