@@ -112,7 +112,8 @@ defmodule Aoc2019.Intcode do
           end
 
         # read the result address
-        res_idx = Map.fetch!(program.body, instruction_ptr + 1)
+        res_idx =
+          Map.fetch!(program.body, instruction_ptr + 1) |> fetch_return_address(0, parameter_modes, state.relative_base)
 
         # save input at the result address, and advance the instruction pointer
         program = put_in(program, [:body, res_idx], input)
@@ -179,6 +180,17 @@ defmodule Aoc2019.Intcode do
           state.relative_base
         )
         |> interpret()
+
+      @increase_relative_base_op ->
+        relative_base_offset_idx_or_value = Map.fetch!(program.body, instruction_ptr + 1)
+
+        relative_base_offset =
+          fetch_parameter(program.body, relative_base_offset_idx_or_value, 0, parameter_modes, state.relative_base)
+
+        instruction_ptr = advance_instruction_ptr(instruction_ptr, 2)
+        state = %{state | relative_base: state.relative_base + relative_base_offset, instruction_ptr: instruction_ptr}
+
+        interpret(state)
     end
   end
 
@@ -229,7 +241,9 @@ defmodule Aoc2019.Intcode do
           {arg1 :: value(), arg2 :: value(), res_idx :: address()}
   def get_binary_arguments(program, parameter_modes, instruction_ptr, relative_base) do
     {arg1, arg2} = read_two_arguments(program, parameter_modes, instruction_ptr, relative_base)
-    res_idx = Map.fetch!(program.body, instruction_ptr + 3)
+
+    res_idx = Map.fetch!(program.body, instruction_ptr + 3) |> fetch_return_address(2, parameter_modes, relative_base)
+
     {arg1, arg2, res_idx}
   end
 
@@ -247,9 +261,19 @@ defmodule Aoc2019.Intcode do
   @spec fetch_parameter(body(), address() | value(), non_neg_integer(), [parameter_mode()], relative_base()) :: any
   def fetch_parameter(body, parameter_idx_or_value, mode_idx, parameter_modes, relative_base) do
     case Enum.at(parameter_modes, mode_idx, 0) do
-      @position_mode -> Map.fetch!(body, parameter_idx_or_value)
+      @position_mode -> Map.get(body, parameter_idx_or_value, 0)
       @immediate_mode -> parameter_idx_or_value
-      @relative_mode -> Map.fetch!(body, relative_base + parameter_idx_or_value)
+      @relative_mode -> Map.get(body, relative_base + parameter_idx_or_value, 0)
+    end
+  end
+
+  @spec fetch_return_address(address() | value(), non_neg_integer(), [parameter_mode()], relative_base()) ::
+          address() | no_return()
+  def fetch_return_address(parameter_idx_or_value, mode_idx, parameter_modes, relative_base) do
+    case Enum.at(parameter_modes, mode_idx, 0) do
+      @position_mode -> parameter_idx_or_value
+      @immediate_mode -> raise "return address cannot be in immediate mode"
+      @relative_mode -> relative_base + parameter_idx_or_value
     end
   end
 
