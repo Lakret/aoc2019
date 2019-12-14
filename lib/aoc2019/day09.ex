@@ -9,4 +9,11 @@ defmodule Aoc2019.Day09 do
 
     boost_keycode
   end
+
+  @spec solve_part_two() :: Intcode.value()
+  def solve_part_two() do
+    %{outputs: [coordinate_of_distress_signal]} = read_input(9) |> Intcode.execute_program([2])
+
+    coordinate_of_distress_signal
+  end
 end

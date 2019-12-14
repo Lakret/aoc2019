@@ -9,10 +9,9 @@ defmodule Aoc2019.Day09Test do
     assert solve_part_one() == 2_350_741_403
   end
 
-  # @tag :expensive
-  # test "part 2 is solved correctly" do
-  #   assert solve_part_two() == 59_597_414
-  # end
+  test "part 2 is solved correctly" do
+    assert solve_part_two() == 53088
+  end
 
   test "quine with relative mode addresses works" do
     quine = "109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99"
