@@ -3,6 +3,10 @@ defmodule Aoc2019.Day15Test do
 
   alias Aoc2019.Day15
 
+  test "part 1 is solved correctly" do
+    assert Day15.solve_part_one() == 222
+  end
+
   test "move_stepwise works" do
     {output, cont} = Day15.move_stepwise(:n)
     assert output == :wall
