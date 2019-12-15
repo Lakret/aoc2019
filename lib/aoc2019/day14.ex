@@ -13,6 +13,15 @@ defmodule Aoc2019.Day14 do
     ore
   end
 
+  @spec solve_part_two() :: non_neg_integer()
+  def solve_part_two() do
+    reactions =
+      read_input(14)
+      |> parse_reactions()
+
+    maximum_possible(reactions, "FUEL", 1_000_000_000_000)
+  end
+
   # Parser
 
   @type compound :: String.t()
@@ -53,6 +62,11 @@ defmodule Aoc2019.Day14 do
 
   @type unused_compounds :: %{compound => quantity}
 
+  @doc """
+  Finds total ore required to synthesize `quantity` of `compound` via `reactions`.
+
+  Returns a tuple of produced quantity of `compound`, and a map of `unused_compounds`.
+  """
   @spec find_total_ore(reactions(), compound(), quantity(), unused_compounds()) :: {quantity(), unused_compounds()}
   def find_total_ore(reactions, compound, quantity, unused_compounds \\ %{}) do
     unused_quantity = unused_compounds[compound] || 0
@@ -83,10 +97,20 @@ defmodule Aoc2019.Day14 do
         end)
 
       unused_compounds = Map.put(unused_compounds, compound, unused)
-
       Logger.debug("to get #{quantity} #{compound}: #{times}x #{inspect(reagents)}")
       Logger.debug("\tunused compounds after: #{inspect(unused_compounds)}")
+
       {total_ore, unused_compounds}
     end
+  end
+
+  @doc """
+  Finds the maximum possible `quantity` of `compound` produced via `reactions`
+  from `total_ore` ore quantity.
+  """
+  @spec maximum_possible(reactions(), compound(), quantity()) :: quantity()
+  def maximum_possible(reactions, compound, total_ore) do
+    # TODO:
+    0
   end
 end

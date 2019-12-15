@@ -7,9 +7,9 @@ defmodule Aoc2019.Day14Test do
     assert solve_part_one() == 504_284
   end
 
-  # test "part 2 is solved correctly" do
-  #   assert solve_part_two() == 394
-  # end
+  test "part 2 is solved correctly" do
+    assert solve_part_two() != 0
+  end
 
   @simple_reactions_raw """
   10 ORE => 10 A
