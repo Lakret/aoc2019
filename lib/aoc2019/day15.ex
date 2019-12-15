@@ -18,6 +18,31 @@ defmodule Aoc2019.Day15 do
   def flood_fill() do
   end
 
+  @spec move_stepwise(direction, Intcode.input_cont() | nil) :: {status, Intcode.input_cont()}
+  def move_stepwise(direction, cont \\ nil) do
+    direction = encode_direction(direction)
+
+    yield_state =
+      case cont do
+        nil -> read_input(15) |> Intcode.execute_program_with_io_adapter([], :yield, :yield)
+        input_cont when is_function(input_cont) -> input_cont.(direction)
+      end
+
+    {output, input_cont} =
+      case yield_state do
+        {:input, _state, input_cont} ->
+          {:output, output, _state, output_cont} = input_cont.(direction)
+          {:input, _state, input_cont} = output_cont.()
+          {output, input_cont}
+
+        {:output, output, _state, output_cont} ->
+          {:input, _state, input_cont} = output_cont.()
+          {output, input_cont}
+      end
+
+    {decode_status(output), input_cont}
+  end
+
   def move_manually() do
     read_input(15)
     |> Intcode.execute_program_with_io_adapter(

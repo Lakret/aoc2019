@@ -20,8 +20,8 @@ defmodule Aoc2019.Intcode do
           output_fun: output_fun()
         }
 
-  @type output_cont :: (() -> program() | no_return())
-  @type input_cont :: (value() -> program() | no_return())
+  @type output_cont :: (() -> program() | no_return() | input_yield() | output_yield())
+  @type input_cont :: (value() -> program() | no_return() | input_yield() | output_yield())
   @type output_yield :: {:output, output :: value(), state(), output_cont()}
   @type input_yield :: {:input, state(), input_cont()}
 
@@ -86,7 +86,7 @@ defmodule Aoc2019.Intcode do
     %{program: program, instruction_ptr: 0, relative_base: 0, input_fun: input_fun, output_fun: output_fun}
   end
 
-  @spec interpret(program_or_state :: program() | state()) :: program() | no_return()
+  @spec interpret(program_or_state :: program() | state()) :: program() | no_return() | input_yield() | output_yield()
   def interpret(%{program: program, instruction_ptr: instruction_ptr} = state) do
     {opcode, parameter_modes} = Map.fetch!(program.body, instruction_ptr) |> parse_instruction()
 
