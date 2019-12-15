@@ -107,10 +107,38 @@ defmodule Aoc2019.Day14 do
   @doc """
   Finds the maximum possible `quantity` of `compound` produced via `reactions`
   from `total_ore` ore quantity.
+
+  Uses binary search to maximize the output.
   """
   @spec maximum_possible(reactions(), compound(), quantity()) :: quantity()
   def maximum_possible(reactions, compound, total_ore) do
-    # TODO:
-    0
+    binary_search(reactions, compound, total_ore, 0, total_ore, nil)
+  end
+
+  @spec binary_search(reactions(), compound(), quantity(), quantity(), quantity(), quantity() | nil) :: integer
+  def binary_search(reactions, compound, total_ore, lower, upper, previous_guess \\ nil) do
+    guess = floor((lower + upper) / 2)
+
+    if guess == previous_guess do
+      guess
+    else
+      {ore_requirement, _unused} = find_total_ore(reactions, compound, guess)
+
+      Logger.debug("lower = #{lower}, upper = #{upper}, guess = #{guess}, ore_requirement = #{ore_requirement}")
+
+      cond do
+        ore_requirement < total_ore ->
+          binary_search(reactions, compound, total_ore, guess, upper, guess)
+
+        ore_requirement > total_ore ->
+          binary_search(reactions, compound, total_ore, lower, guess, guess)
+
+        ore_requirement == total_ore && lower - upper <= 1 ->
+          guess
+
+        ore_requirement == total_ore ->
+          binary_search(reactions, compound, total_ore, min(guess, lower), min(guess + 1, upper), guess)
+      end
+    end
   end
 end

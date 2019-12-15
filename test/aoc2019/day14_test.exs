@@ -8,7 +8,7 @@ defmodule Aoc2019.Day14Test do
   end
 
   test "part 2 is solved correctly" do
-    assert solve_part_two() != 0
+    assert solve_part_two() == 2_690_795
   end
 
   @simple_reactions_raw """
