@@ -9,8 +9,8 @@ defmodule Aoc2019.Intcode do
   @type address :: non_neg_integer()
   @type value :: integer()
   @type instruction_ptr :: non_neg_integer()
-  @type input_fun :: (() -> value()) | nil
-  @type output_fun :: (value() -> :ok) | nil
+  @type input_fun :: (() -> value()) | nil | :yield
+  @type output_fun :: (value() -> :ok) | nil | :yield
   @type relative_base :: integer()
   @type state :: %{
           program: program(),
@@ -19,6 +19,11 @@ defmodule Aoc2019.Intcode do
           input_fun: input_fun(),
           output_fun: output_fun()
         }
+
+  @type output_cont :: (() -> program() | no_return())
+  @type input_cont :: (value() -> program() | no_return())
+  @type output_yield :: {:output, output :: value(), state(), output_cont()}
+  @type input_yield :: {:input, state(), input_cont()}
 
   @type opcode :: non_neg_integer()
   @type parameter_mode :: non_neg_integer()
@@ -85,118 +90,134 @@ defmodule Aoc2019.Intcode do
   def interpret(%{program: program, instruction_ptr: instruction_ptr} = state) do
     {opcode, parameter_modes} = Map.fetch!(program.body, instruction_ptr) |> parse_instruction()
 
-    case opcode do
-      @terminate_op ->
-        program
+    try do
+      case opcode do
+        @terminate_op ->
+          program
 
-      @add_op ->
-        execute_binary_operation(state, parameter_modes, instruction_ptr, &+/2, state.relative_base)
-        |> interpret()
+        @add_op ->
+          execute_binary_operation(state, parameter_modes, instruction_ptr, &+/2, state.relative_base)
+          |> interpret()
 
-      @multiply_op ->
-        execute_binary_operation(state, parameter_modes, instruction_ptr, &*/2, state.relative_base)
-        |> interpret()
+        @multiply_op ->
+          execute_binary_operation(state, parameter_modes, instruction_ptr, &*/2, state.relative_base)
+          |> interpret()
 
-      @input_op ->
-        # take input
-        {input, program} =
-          case program.inputs do
-            [] ->
-              if is_nil(state[:input_fun]), do: raise("Ran out of inputs and input_fun is not set!")
+        @input_op ->
+          # read the result address
+          res_idx =
+            Map.fetch!(program.body, instruction_ptr + 1)
+            |> fetch_return_address(0, parameter_modes, state.relative_base)
 
-              input = state[:input_fun].()
-              {input, program}
+          # take input
+          {input, program} =
+            case program.inputs do
+              [] ->
+                case state[:input_fun] do
+                  nil -> raise("Ran out of inputs and input_fun is not set!")
+                  :yield -> throw({:input, state, &continue_with_input(&1, program, res_idx, instruction_ptr, state)})
+                  input_fun when is_function(input_fun) -> {input_fun.(), program}
+                end
 
-            [input | remaining_inputs] ->
-              {input, Map.put(program, :inputs, remaining_inputs)}
+              [input | remaining_inputs] ->
+                {input, Map.put(program, :inputs, remaining_inputs)}
+            end
+
+          continue_with_input(input, program, res_idx, instruction_ptr, state)
+
+        @output_op ->
+          # read the value (accounting for the parameter mode)
+          output_idx_or_value = Map.fetch!(program.body, instruction_ptr + 1)
+          output = fetch_parameter(program.body, output_idx_or_value, 0, parameter_modes, state.relative_base)
+
+          # output it, advance the instruction pointer
+          program = put_in(program.outputs, program.outputs ++ [output])
+
+          instruction_ptr = advance_instruction_ptr(instruction_ptr, 2)
+
+          state = %{state | program: program, instruction_ptr: instruction_ptr}
+
+          case state[:output_fun] do
+            nil -> :ok
+            :yield -> throw({:output, output, state, fn -> interpret(state) end})
+            output_fun when is_function(output_fun) -> state.output_fun.(output)
           end
 
-        # read the result address
-        res_idx =
-          Map.fetch!(program.body, instruction_ptr + 1) |> fetch_return_address(0, parameter_modes, state.relative_base)
+          interpret(state)
 
-        # save input at the result address, and advance the instruction pointer
-        program = put_in(program, [:body, res_idx], input)
-        instruction_ptr = advance_instruction_ptr(instruction_ptr, 2)
+        @jump_if_true_op ->
+          {arg1, arg2} = read_two_arguments(program, parameter_modes, instruction_ptr, state.relative_base)
 
-        interpret(%{state | program: program, instruction_ptr: instruction_ptr})
+          instruction_ptr =
+            if arg1 != 0 do
+              arg2
+            else
+              advance_instruction_ptr(instruction_ptr, 3)
+            end
 
-      @output_op ->
-        # read the value (accounting for the parameter mode)
-        output_idx_or_value = Map.fetch!(program.body, instruction_ptr + 1)
-        output = fetch_parameter(program.body, output_idx_or_value, 0, parameter_modes, state.relative_base)
+          interpret(%{state | program: program, instruction_ptr: instruction_ptr})
 
-        # output it, advance the instruction pointer
-        program = put_in(program.outputs, program.outputs ++ [output])
+        @jump_if_false_op ->
+          {arg1, arg2} = read_two_arguments(program, parameter_modes, instruction_ptr, state.relative_base)
 
-        if not is_nil(state[:output_fun]) do
-          state.output_fun.(output)
-        end
+          instruction_ptr =
+            if arg1 == 0 do
+              arg2
+            else
+              advance_instruction_ptr(instruction_ptr, 3)
+            end
 
-        instruction_ptr = advance_instruction_ptr(instruction_ptr, 2)
+          interpret(%{state | program: program, instruction_ptr: instruction_ptr})
 
-        interpret(%{state | program: program, instruction_ptr: instruction_ptr})
+        @less_than_op ->
+          execute_binary_operation(
+            state,
+            parameter_modes,
+            instruction_ptr,
+            fn arg1, arg2 -> if arg1 < arg2, do: 1, else: 0 end,
+            state.relative_base
+          )
+          |> interpret()
 
-      @jump_if_true_op ->
-        {arg1, arg2} = read_two_arguments(program, parameter_modes, instruction_ptr, state.relative_base)
+        @equals_op ->
+          execute_binary_operation(
+            state,
+            parameter_modes,
+            instruction_ptr,
+            fn arg1, arg2 -> if arg1 == arg2, do: 1, else: 0 end,
+            state.relative_base
+          )
+          |> interpret()
 
-        instruction_ptr =
-          if arg1 != 0 do
-            arg2
-          else
-            advance_instruction_ptr(instruction_ptr, 3)
-          end
+        @increase_relative_base_op ->
+          relative_base_offset_idx_or_value = Map.fetch!(program.body, instruction_ptr + 1)
 
-        interpret(%{state | program: program, instruction_ptr: instruction_ptr})
+          relative_base_offset =
+            fetch_parameter(program.body, relative_base_offset_idx_or_value, 0, parameter_modes, state.relative_base)
 
-      @jump_if_false_op ->
-        {arg1, arg2} = read_two_arguments(program, parameter_modes, instruction_ptr, state.relative_base)
+          instruction_ptr = advance_instruction_ptr(instruction_ptr, 2)
+          state = %{state | relative_base: state.relative_base + relative_base_offset, instruction_ptr: instruction_ptr}
 
-        instruction_ptr =
-          if arg1 == 0 do
-            arg2
-          else
-            advance_instruction_ptr(instruction_ptr, 3)
-          end
-
-        interpret(%{state | program: program, instruction_ptr: instruction_ptr})
-
-      @less_than_op ->
-        execute_binary_operation(
-          state,
-          parameter_modes,
-          instruction_ptr,
-          fn arg1, arg2 -> if arg1 < arg2, do: 1, else: 0 end,
-          state.relative_base
-        )
-        |> interpret()
-
-      @equals_op ->
-        execute_binary_operation(
-          state,
-          parameter_modes,
-          instruction_ptr,
-          fn arg1, arg2 -> if arg1 == arg2, do: 1, else: 0 end,
-          state.relative_base
-        )
-        |> interpret()
-
-      @increase_relative_base_op ->
-        relative_base_offset_idx_or_value = Map.fetch!(program.body, instruction_ptr + 1)
-
-        relative_base_offset =
-          fetch_parameter(program.body, relative_base_offset_idx_or_value, 0, parameter_modes, state.relative_base)
-
-        instruction_ptr = advance_instruction_ptr(instruction_ptr, 2)
-        state = %{state | relative_base: state.relative_base + relative_base_offset, instruction_ptr: instruction_ptr}
-
-        interpret(state)
+          interpret(state)
+      end
+    catch
+      {:output, _output, _state, _cont} = output_yield -> output_yield
+      {:input, _state, _cont} = input_yield -> input_yield
     end
   end
 
   def interpret(program) do
     initialize_interpret_state(program)
     |> interpret()
+  end
+
+  @spec continue_with_input(value(), program(), address(), instruction_ptr(), state()) :: program() | no_return()
+  def continue_with_input(input, program, res_idx, instruction_ptr, state) do
+    # save input at the result address, and advance the instruction pointer
+    program = put_in(program, [:body, res_idx], input)
+    instruction_ptr = advance_instruction_ptr(instruction_ptr, 2)
+
+    interpret(%{state | program: program, instruction_ptr: instruction_ptr})
   end
 
   @spec parse_instruction(non_neg_integer()) :: {opcode(), [parameter_mode()]}
