@@ -79,6 +79,38 @@ defmodule Aoc2019.Intcode do
     |> interpret()
   end
 
+  @doc """
+  Inputs string `input_string` into a yielded state `input_yield` from an executing Intcode program.
+
+  Typically, the last character in the `input_string` should be a newline.
+
+  Returns a new yielded state after the input is feeded into the program.
+  """
+  @spec input_string_as_char_codes_in_yield_mode(input_yield(), String.t()) :: input_yield() | output_yield() | state()
+  def input_string_as_char_codes_in_yield_mode(input_yield, input_string) when is_binary(input_string) do
+    input = String.to_charlist(input_string)
+
+    # we need to input each character one by one, since Intcode input instruction expects to get one integer at a time;
+    [yield_state] =
+      Stream.unfold({input_yield, input}, fn
+        {{:input, _, cont}, [next | rest]} ->
+          {nil, {cont.(next), rest}}
+
+        {{:input, _, _cont} = input_yield, []} ->
+          {input_yield, nil}
+
+        {input_yield, []} ->
+          {input_yield, nil}
+
+        nil ->
+          nil
+      end)
+      |> Enum.into([])
+      |> Enum.reject(&is_nil/1)
+
+    yield_state
+  end
+
   defp initialize_interpret_state(program, opts \\ []) do
     input_fun = Keyword.get(opts, :input_fun)
     output_fun = Keyword.get(opts, :output_fun)
